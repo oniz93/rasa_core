@@ -149,11 +149,11 @@ class KerasPolicy(Policy):
         for X, y in zip(training_data.X, training_data.y):
             if y.argmax(axis=-1) == i_success:
                 new_X.append(X)
-                new_y.append(y[-2:])
+                new_y.append([1, 0])
                 total_yes += 1
             elif y.argmax(axis=-1) == i_fail:
                 new_X.append(X)
-                new_y.append(y[-2:])
+                new_y.append([0, 1])
                 total_no += 1
 
         print(total_yes, total_no)
@@ -227,9 +227,14 @@ class KerasPolicy(Policy):
             y_pred = self.model.predict(X, batch_size=1)
 
         n = len(domain.action_names)
+        i_success = domain.index_for_action('success')
+        i_fail = domain.index_for_action('fail')
 
         if len(y_pred.shape) == 2:
-            return [0] * (n - 2) + y_pred[-1].tolist()
+            probs = [0] * n
+            probs[i_success] = y_pred[-1].tolist()[0]
+            probs[i_fail] = y_pred[-1].tolist()[1]
+            return probs
         elif len(y_pred.shape) == 3:
             return y_pred[0, -1].tolist()
 
