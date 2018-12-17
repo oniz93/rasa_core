@@ -139,27 +139,57 @@ class KerasPolicy(Policy):
         training_data = self.featurize_for_training(training_trackers,
                                                     domain,
                                                     **kwargs)
-        print(training_data.X.shape, training_data.y.shape)
-        i_success = domain.index_for_action('success')
-        i_fail = domain.index_for_action('fail')
-        new_X = []
-        new_y = []
-        total_yes = 0
-        total_no = 0
-        for X, y in zip(training_data.X, training_data.y):
-            if y.argmax(axis=-1) == i_success:
-                new_X.append(X)
-                new_y.append([1, 0])
-                total_yes += 1
-            elif y.argmax(axis=-1) == i_fail:
-                new_X.append(X)
-                new_y.append([0, 1])
-                total_no += 1
 
-        print(total_yes, total_no)
-        training_data.X = np.array(new_X)
-        training_data.y = np.array(new_y)
+        import codecs
+        import csv
+        from tqdm import tqdm
+        csvfile = codecs.open("data/Intents_ Actions >> User Goal - Sheet1.csv", 'r')
+        reader = csv.DictReader(csvfile)
+        pbar = tqdm(reader)
+        topic_dict = {}
+        for row in pbar:
+            if row['User goal'] and row['type'] == 'action':
+                topic_dict[row['Intent/Action Name'][2:]] = row['User goal']
+                if row['if_success']:
+                    topic_dict[row['Intent/Action Name'][2:]] += '_' + row['if_success']
+
         print(training_data.X.shape, training_data.y.shape)
+
+        # i_success = domain.index_for_action('success')
+        # i_fail = domain.index_for_action('fail')
+        # new_X = []
+        # new_y = []
+        # total_yes = 0
+        # total_no = 0
+        # for X, y in zip(training_data.X, training_data.y):
+        #     if y.argmax(axis=-1) == i_success:
+        #         new_X.append(X)
+        #         new_y.append([1, 0])
+        #         total_yes += 1
+        #     elif y.argmax(axis=-1) == i_fail:
+        #         new_X.append(X)
+        #         new_y.append([0, 1])
+        #         total_no += 1
+        #
+        # print(total_yes, total_no)
+        # training_data.X = np.array(new_X)
+        # training_data.y = np.array(new_y)
+        # print(training_data.X.shape, training_data.y.shape)
+
+        for y in training_data.y:
+            if len(y.shape) == 1:
+                action = domain.action_names[y.argmax(axis=-1)]
+                if topic_dict.get(action):
+                    i_topic = domain.index_for_action(topic_dict[action])
+                    y[y.argmax(axis=-1)] = 0
+                    y[i_topic] = 1
+            else:
+                for y1 in y:
+                    action = domain.action_names[y1.argmax(axis=-1)]
+                    if topic_dict.get(action):
+                        i_topic = domain.index_for_action(topic_dict[action])
+                        y1[y1.argmax(axis=-1)] = 0
+                        y1[i_topic] = 1
 
         # noinspection PyPep8Naming
         shuffled_X, shuffled_y = training_data.shuffled_X_y()
@@ -226,15 +256,15 @@ class KerasPolicy(Policy):
         with self.graph.as_default(), self.session.as_default():
             y_pred = self.model.predict(X, batch_size=1)
 
-        n = len(domain.action_names)
-        i_success = domain.index_for_action('success')
-        i_fail = domain.index_for_action('fail')
+        # n = len(domain.action_names)
+        # i_success = domain.index_for_action('success')
+        # i_fail = domain.index_for_action('fail')
 
         if len(y_pred.shape) == 2:
-            probs = [0] * n
-            probs[i_success] = y_pred[-1].tolist()[0]
-            probs[i_fail] = y_pred[-1].tolist()[1]
-            return probs
+            # probs = [0] * n
+            # probs[i_success] = y_pred[-1].tolist()[0]
+            # probs[i_fail] = y_pred[-1].tolist()[1]
+            return y_pred[-1].tolist()
         elif len(y_pred.shape) == 3:
             return y_pred[0, -1].tolist()
 
