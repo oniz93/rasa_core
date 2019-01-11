@@ -67,6 +67,7 @@ class MessageProcessor(object):
         self.message_preprocessor = message_preprocessor
         self.on_circuit_break = on_circuit_break
         self.action_endpoint = action_endpoint
+        self.parse_data = []
 
     def handle_message(self, message: UserMessage) -> Optional[List[Text]]:
         """Handle a single message with this processor."""
@@ -253,14 +254,31 @@ class MessageProcessor(object):
                                      message: UserMessage,
                                      tracker: DialogueStateTracker) -> None:
 
+        firstTime = False
         if message.parse_data:
             parse_data = message.parse_data
         else:
             parse_data = self._parse_message(message)
 
+            # save the message for next use
+            self.parse_data = message
+            # add parse_data to message
+            self.parse_data.parse_data = parse_data
+            firstTime = True
+
+        intent_name = parse_data["intent"]
+
+        # if isn't the first time that I enter in this function
+        # pop the intent_ranking of the predicted intents and use it for the next action prediction
+        if len(parse_data["intent_ranking"]) > 0 and firstTime == False:
+            intent_name = message.parse_data["intent_ranking"].pop(0)
+
+            # save the new message without the popped prediction
+            self.parse_data = message
+
         # don't ever directly mutate the tracker
         # - instead pass its events to log
-        tracker.update(UserUttered(message.text, parse_data["intent"],
+        tracker.update(UserUttered(message.text, intent_name,
                                    parse_data["entities"], parse_data,
                                    input_channel=message.input_channel))
         # store all entities as slots
@@ -293,6 +311,14 @@ class MessageProcessor(object):
                num_predicted_actions < self.max_number_of_predictions):
             # this actually just calls the policy's method by the same name
             action, policy, confidence = self.predict_next_action(tracker)
+
+            # if the predicted action if "action_default_fallback" and there are any other possibile intent to test, try them
+            if action.name() == "action_default_fallback" and len(self.parse_data.parse_data["intent_ranking"]) > 0:    
+                self._handle_message_with_tracker(self.parse_data, tracker)
+                self._predict_and_execute_next_action(self.parse_data, tracker)
+                break
+
+            ## Devo mettere un if e far finta di rifare il parse ....
 
             should_predict_another_action = self._run_action(action,
                                                              tracker,
