@@ -269,8 +269,9 @@ class MessageProcessor(object):
         intent_name = parse_data["intent"]
 
         # if isn't the first time that I enter in this function
-        # pop the intent_ranking of the predicted intents and use it for the next action prediction
-        if len(parse_data["intent_ranking"]) > 0 and firstTime == False:
+        # pop the intent_ranking of the predicted intents
+        # and use it for the next action prediction
+        if len(parse_data["intent_ranking"]) > 0 and firstTime is False:
             intent_name = message.parse_data["intent_ranking"].pop(0)
 
             # save the new message without the popped prediction
@@ -312,13 +313,13 @@ class MessageProcessor(object):
             # this actually just calls the policy's method by the same name
             action, policy, confidence = self.predict_next_action(tracker)
 
-            # if the predicted action if "action_default_fallback" and there are any other possibile intent to test, try them
-            if action.name() == "action_default_fallback" and len(self.parse_data.parse_data["intent_ranking"]) > 0:    
+            # if the predicted action if "action_default_fallback"
+            # and there are any other possibile intent to test, try them
+            if (action.name() == "action_default_fallback" and 
+                len(self.parse_data.parse_data["intent_ranking"]) > 0):
                 self._handle_message_with_tracker(self.parse_data, tracker)
                 self._predict_and_execute_next_action(self.parse_data, tracker)
                 break
-
-            ## Devo mettere un if e far finta di rifare il parse ....
 
             should_predict_another_action = self._run_action(action,
                                                              tracker,
